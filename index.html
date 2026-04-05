@@ -427,7 +427,7 @@ function selectChip(el){
     nameInput.readOnly=false;nameInput.style.opacity='1';nameInput.style.cursor='';
     kcalInput.value='';
     kcalInput.readOnly=false;kcalInput.style.opacity='1';kcalInput.style.cursor='';
-    nameInput.focus();
+    kcalInput.focus();
   }
 }
 
@@ -564,17 +564,18 @@ function empty(){return'<div style="color:var(--muted);font-size:13px;text-align
 function addFood(){
   const n=document.getElementById('food-name').value.trim();
   const k=parseInt(document.getElementById('food-kcal').value);
-  if(!n||isNaN(k)||k<=0)return;
+  if(isNaN(k)||k<=0)return;
   const icon=selectedChip?selectedChip.dataset.icon:'🍴';
-  S.days[TK].foods.push({name:n,kcal:k,icon});
+  const name=n||(selectedChip?.dataset.name||'Sin nombre');
+  S.days[TK].foods.push({name,kcal:k,icon});
   save();resetAddRow();render();
 }
 function removeFood(i){S.days[TK].foods.splice(i,1);save();render();}
 function addActivity(){
   const n=document.getElementById('act-name').value.trim();
   const k=parseInt(document.getElementById('act-kcal').value);
-  if(!n||isNaN(k)||k<=0)return;
-  S.days[TK].activities.push({name:n,kcal:k});save();
+  if(isNaN(k)||k<=0)return;
+  S.days[TK].activities.push({name:n||'Actividad',kcal:k});save();
   document.getElementById('act-name').value='';document.getElementById('act-kcal').value='';
   render();
 }
@@ -645,6 +646,9 @@ function showSubtab(name){
 
 document.getElementById('food-kcal').addEventListener('keydown',e=>{if(e.key==='Enter')addFood();});
 document.getElementById('act-kcal').addEventListener('keydown',e=>{if(e.key==='Enter')addActivity();});
+document.getElementById('act-name').addEventListener('focus',()=>{
+  setTimeout(()=>document.getElementById('act-kcal').focus(),0);
+});
 
 render();
 if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{});}
