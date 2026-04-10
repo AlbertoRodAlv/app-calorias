@@ -168,7 +168,7 @@
     <div class="header-title">Cal<span>Track</span></div>
     <div class="header-sub">vamos a ponernos fit!</div>
     <div class="date-nav">
-      <button class="date-nav-btn" onclick="changeDay(-1)">‹</button>
+      <button class="date-nav-btn" id="btn-prev" onclick="changeDay(-1)">‹</button>
       <span class="date-nav-label" id="date-nav-label">Hoy</span>
       <button class="date-nav-btn" id="btn-next" onclick="changeDay(1)" style="opacity:.3;pointer-events:none">›</button>
     </div>
@@ -302,8 +302,8 @@
     <!-- ACUMULADO -->
     <div class="tab" id="tab-acumulado">
       <div class="subtab-bar">
-        <button class="subtab active" id="subtab-mes" onclick="showSubtab('mes')">Este mes</button>
-        <button class="subtab" id="subtab-anyo" onclick="showSubtab('anyo')">Este año</button>
+        <button class="subtab active" id="subtab-mes" onclick="showSubtab('mes')">Últimos 30 días</button>
+        <button class="subtab" id="subtab-anyo" onclick="showSubtab('anyo')">Últimos 365 días</button>
       </div>
       <div class="subtab-content active" id="sc-mes">
         <div class="acum-grid">
@@ -399,6 +399,8 @@ function changeDay(dir){
   d.setDate(d.getDate()+dir);
   const newKey=d.toISOString().split('T')[0];
   if(newKey>TODAY) return;
+  const diffDays=Math.round((new Date(TODAY+'T12:00:00')-new Date(newKey+'T12:00:00'))/86400000);
+  if(diffDays>2) return;
   TK=newKey;
   if(!S.days[TK]) S.days[TK]={foods:[],activities:[]};
   save();
@@ -412,12 +414,15 @@ function updateDateNav(){
   const d=new Date(TK+'T12:00:00');
   const isToday=TK===TODAY;
   const diffDays=Math.round((new Date(TODAY+'T12:00:00')-d)/86400000);
-  let label=isToday?'Hoy':diffDays===1?'Ayer':DAYS[d.getDay()]+' '+d.getDate()+'/'+('0'+(d.getMonth()+1)).slice(-2);
+  let label=isToday?'Hoy':diffDays===1?'Ayer':'Hace 2 días';
   document.getElementById('date-nav-label').textContent=label;
   document.getElementById('header-date').textContent=DAYS[d.getDay()]+', '+d.getDate()+' '+MONTHS[d.getMonth()];
   const btnNext=document.getElementById('btn-next');
   btnNext.style.opacity=isToday?'.3':'1';
   btnNext.style.pointerEvents=isToday?'none':'auto';
+  const btnPrev=document.getElementById('btn-prev');
+  btnPrev.style.opacity=diffDays>=2?'.3':'1';
+  btnPrev.style.pointerEvents=diffDays>=2?'none':'auto';
 }
 
 function getEffective(hist,dk){
@@ -556,9 +561,13 @@ function setPeriod(id,kcal){
 
 /* ── ACUMULADO ── */
 function renderAcumulado(){
-  const mp=TK.slice(0,7),ap=TK.slice(0,4);
+  const allKeys=Object.keys(S.days).filter(dk=>dk<=TODAY).sort();
+
+  // MES: últimos 30 días desde hoy
+  const mesFrom=offsetDate(TODAY,-29);
+  const mesKeys=allKeys.filter(dk=>dk>=mesFrom);
   let mIn=0,mOut=0,mDays=0;const wMap={};
-  Object.keys(S.days).filter(dk=>dk.startsWith(mp)).forEach(dk=>{
+  mesKeys.forEach(dk=>{
     const tin=dIn(dk),tout=dOut(dk);mIn+=tin;mOut+=tout;if(tin>0)mDays++;
     const wn=weekNum(new Date(dk+'T12:00:00'));
     if(!wMap[wn])wMap[wn]={in:0,out:0};wMap[wn].in+=tin;wMap[wn].out+=tout;
@@ -568,8 +577,11 @@ function renderAcumulado(){
   document.getElementById('mes-dias').textContent=mDays||'—';
   document.getElementById('mes-weeks').innerHTML=Object.entries(wMap).sort((a,b)=>+a[0]-+b[0]).map(([wn,w])=>periodRow('S'+wn,w.in-w.out,mBal)).join('')||empty();
 
+  // AÑO: últimos 365 días desde hoy
+  const anyoFrom=offsetDate(TODAY,-364);
+  const anyoKeys=allKeys.filter(dk=>dk>=anyoFrom);
   let aIn=0,aOut=0,aDays=0;const mnMap={};
-  Object.keys(S.days).filter(dk=>dk.startsWith(ap)).forEach(dk=>{
+  anyoKeys.forEach(dk=>{
     const tin=dIn(dk),tout=dOut(dk);aIn+=tin;aOut+=tout;if(tin>0)aDays++;
     const mn=dk.slice(5,7);if(!mnMap[mn])mnMap[mn]={in:0,out:0};mnMap[mn].in+=tin;mnMap[mn].out+=tout;
   });
@@ -577,6 +589,12 @@ function renderAcumulado(){
   setAcumBal('anyo-bal',aBal);setAcumAbs('anyo-in',aIn);setAcumAbs('anyo-out',aOut);
   document.getElementById('anyo-dias').textContent=aDays||'—';
   document.getElementById('anyo-months').innerHTML=Object.entries(mnMap).sort((a,b)=>a[0].localeCompare(b[0])).map(([mn,m])=>periodRow(MONTHS[parseInt(mn)-1],m.in-m.out,aBal)).join('')||empty();
+}
+
+function offsetDate(baseKey,days){
+  const d=new Date(baseKey+'T12:00:00');
+  d.setDate(d.getDate()+days);
+  return d.toISOString().split('T')[0];
 }
 
 function setAcumBal(id,kcal){
